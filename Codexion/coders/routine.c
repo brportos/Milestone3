@@ -6,7 +6,7 @@
 /*   By: brportos <brportos@student.42antananari    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/07 19:18:48 by brportos          #+#    #+#             */
-/*   Updated: 2026/09/21 10:48:03 by brportos         ###   ########.fr       */
+/*   Updated: 2026/09/26 15:08:04 by brportos         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -53,9 +53,6 @@ void	*monitoring_simulation(void *arg)
 		if (done == data->ncoder)
 		{
 			stop_simulation(data);
-			pthread_mutex_lock(&data->mutex_print);
-			printf("\033[31mAll compiled successfully.\033[0m\n");
-			pthread_mutex_unlock(&data->mutex_print);
 			return (NULL);
 		}
 		usleep(500);

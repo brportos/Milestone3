@@ -6,7 +6,7 @@
 /*   By: brportos <brportos@student.42antananari    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/07 19:17:25 by brportos          #+#    #+#             */
-/*   Updated: 2026/09/07 19:28:02 by brportos         ###   ########.fr       */
+/*   Updated: 2026/09/28 14:22:29 by brportos         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -60,7 +60,14 @@ void	heap_push(t_heap *heap, t_coder *coder)
 
 static int	heap_compare(t_coder *curr, t_coder *coder)
 {
-	return (get_burnout(curr) < get_burnout(coder));
+	long	curr_burnout;
+	long	coder_burnout;
+
+	curr_burnout = get_burnout(curr);
+	coder_burnout = get_burnout(coder);
+	if (curr_burnout == coder_burnout)
+		return (curr->id < coder->id);
+	return (curr_burnout < coder_burnout);
 }
 
 static void	heap_swap(t_coder **tree, int i, int j)
