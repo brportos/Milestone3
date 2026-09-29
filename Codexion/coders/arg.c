@@ -6,7 +6,7 @@
 /*   By: brportos <brportos@student.42antananari    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/07 19:17:53 by brportos          #+#    #+#             */
-/*   Updated: 2026/09/25 12:42:47 by brportos         ###   ########.fr       */
+/*   Updated: 2026/09/29 14:58:12 by brportos         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -62,14 +62,31 @@ int	isargs_valid(t_data *data, char **argv)
 	return (0);
 }
 
+static int	init_mutexes(t_data *data)
+{
+	int	i;
+
+	i = 0;
+	while (i < data->ndongle)
+	{
+		if (pthread_mutex_init(&data->dongle[i].lock, NULL) != 0)
+			return (display_error("Failed to initialize dongle mutex", NULL,
+					data));
+		i++;
+	}
+	i = 0;
+	while (i < data->ncoder)
+	{
+		if (pthread_mutex_init(&data->coder[i].mutex_burnout, NULL) != 0)
+			return (display_error("Failed to initialize coder mutex", NULL,
+					data));
+		i++;
+	}
+	return (0);
+}
+
 static int	parse_data(t_data *data, int *parsed_argv)
 {
-	data->coder = malloc(sizeof(t_coder) * parsed_argv[0]);
-	if (!data->coder)
-		return (display_error("Can't allocate ", NULL, data));
-	data->dongle = malloc(sizeof(t_dongle) * parsed_argv[0]);
-	if (!data->dongle)
-		return (display_error("Can't allocate ", NULL, data));
 	data->ncoder = parsed_argv[0];
 	data->ndongle = parsed_argv[0];
 	data->max_burnout = parsed_argv[1];
@@ -78,6 +95,14 @@ static int	parse_data(t_data *data, int *parsed_argv)
 	data->time_refactor = parsed_argv[4];
 	data->required_compile = parsed_argv[5];
 	data->dongle_cooldown = parsed_argv[6];
+	data->coder = malloc(sizeof(t_coder) * data->ncoder);
+	if (!data->coder)
+		return (display_error("Can't allocate ", NULL, data));
+	data->dongle = malloc(sizeof(t_dongle) * data->ndongle);
+	if (!data->dongle)
+		return (display_error("Can't allocate ", NULL, data));
+	if (init_mutexes(data) != 0)
+		return (1);
 	return (0);
 }
 

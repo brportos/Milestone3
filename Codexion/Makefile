@@ -1,9 +1,7 @@
 NAME = codexion
 
-CC = cc -g
+CC = cc
 CFLAGS = -Wall -Wextra -Werror -pthread
-
-
 SRC = coders/coders.c \
 	coders/main.c \
 	coders/dongle.c \

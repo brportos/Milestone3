@@ -6,7 +6,7 @@
 /*   By: brportos <brportos@student.42antananari    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/07 19:18:20 by brportos          #+#    #+#             */
-/*   Updated: 2026/09/18 08:43:38 by brportos         ###   ########.fr       */
+/*   Updated: 2026/09/29 15:24:31 by brportos         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,11 @@
 static int	try_take_dongle(t_dongle *dongle, t_data *data)
 {
 	pthread_mutex_lock(&dongle->lock);
+	if (get_simulation(data) == 0)
+	{
+		pthread_mutex_unlock(&dongle->lock);
+		return (1);
+	}
 	if (get_simul_time(data) >= dongle->cooldown)
 		return (0);
 	pthread_mutex_unlock(&dongle->lock);
