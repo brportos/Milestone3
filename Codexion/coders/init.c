@@ -6,7 +6,7 @@
 /*   By: brportos <brportos@student.42antananari    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/07 19:18:39 by brportos          #+#    #+#             */
-/*   Updated: 2026/09/29 10:19:41 by brportos         ###   ########.fr       */
+/*   Updated: 2026/10/14 23:25:46 by brportos         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -34,7 +34,6 @@ void	init_mutex(t_data *data)
 	pthread_mutex_init(&data->mutex_simul, NULL);
 	pthread_mutex_init(&data->queue_ctrl.lock, NULL);
 	pthread_mutex_init(&data->heap_ctrl.lock, NULL);
-	init_dongles_mutex(data);
 	init_mutex_cond(data);
 }
 
@@ -54,6 +53,7 @@ int	init_struct(t_data *data)
 		i++;
 	}
 	create_coders_and_dongles(data);
+	init_dongles_mutex(data);
 	return (0);
 }
 

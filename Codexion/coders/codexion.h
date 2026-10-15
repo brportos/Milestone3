@@ -6,7 +6,7 @@
 /*   By: brportos <brportos@student.42antananari    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/07 19:18:11 by brportos          #+#    #+#             */
-/*   Updated: 2026/09/16 07:43:45 by brportos         ###   ########.fr       */
+/*   Updated: 2026/10/14 19:52:11 by brportos         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -136,4 +136,5 @@ void				*monitoring_simulation(void *arg);
 void				destroy_mutex(t_data *data);
 void				free_memory(t_data *data);
 int					remove_from_queue(t_queue_manager *manager);
+void				smart_sleep(t_data *data, long duration_ms);
 #endif

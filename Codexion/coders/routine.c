@@ -6,7 +6,7 @@
 /*   By: brportos <brportos@student.42antananari    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/07 19:18:48 by brportos          #+#    #+#             */
-/*   Updated: 2026/09/29 15:25:32 by brportos         ###   ########.fr       */
+/*   Updated: 2026/10/14 20:30:07 by brportos         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -55,7 +55,17 @@ void	*monitoring_simulation(void *arg)
 			stop_simulation(data);
 			return (NULL);
 		}
-		usleep(500);
+		usleep(1000);
 	}
 	return (NULL);
+}
+
+void	smart_sleep(t_data *data, long duration_ms)
+{
+	long	start;
+
+	start = get_time_ms();
+	while (get_simulation(data) == 1
+		&& (get_time_ms() - start) < duration_ms)
+		usleep(1000);
 }

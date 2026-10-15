@@ -6,7 +6,7 @@
 /*   By: brportos <brportos@student.42antananari    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/07 19:18:52 by brportos          #+#    #+#             */
-/*   Updated: 2026/09/21 12:55:02 by brportos         ###   ########.fr       */
+/*   Updated: 2026/10/14 19:35:33 by brportos         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -51,7 +51,7 @@ void	scheduler_edf_add(t_data *data, t_coder *coder)
 			if (take_dongle(coder) == 0)
 				break ;
 		}
-		usleep(00);
+		usleep(1000);
 	}
 	pthread_mutex_lock(&heap->lock);
 	heap_pop(heap, coder);
@@ -68,7 +68,7 @@ static void	fifo_add_queue(t_data *data, t_coder *coder)
 		if (get_simulation(data) == 1 && data->queue_ctrl.first->coder == coder)
 		{
 			pthread_mutex_unlock(&data->queue_ctrl.lock);
-			usleep(300);
+			usleep(1000);
 			pthread_mutex_lock(&data->queue_ctrl.lock);
 		}
 		else
