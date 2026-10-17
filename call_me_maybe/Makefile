@@ -10,10 +10,10 @@ install: venv
 	@uv pip install --python .venv/bin/python3 -r pyproject.toml
 
 run:
-	@uv run python3 src/main.py
+	@uv run python3 -m src
 
 debug:
-	@uv run python3 -m pdb src/main.py
+	@uv run python3 -m pdb src
 
 clean:
 	@find . -type d -name "__pycache__" -exec rm -rf {} +
