@@ -1,4 +1,11 @@
-VENV_PATH = /sgoinfre/brportos/call_me_maybe
+SGOINFRE  = /sgoinfre/$(USER)
+VENV_PATH = $(SGOINFRE)/call_me_maybe
+PYTHON    = .venv/bin/python3
+
+export UV_CACHE_DIR = $(SGOINFRE)/.cache/uv
+export HF_HOME      = $(SGOINFRE)/.cache/huggingface
+
+.PHONY: all venv install run debug clean lint lint-strict
 
 all: run
 
@@ -7,28 +14,27 @@ venv:
 	@ln -sfn $(VENV_PATH) .venv
 
 install: venv
-	@uv pip install --python .venv/bin/python3 -r pyproject.toml
+	@uv pip install --python $(PYTHON) -r pyproject.toml
 
-run:
-	@uv run python3 -m src
+run: install
+	@$(PYTHON) -m src
 
-debug:
-	@uv run python3 -m pdb src
+debug: install
+	@$(PYTHON) -m pdb -m src
 
 clean:
-	@find . -type d -name "__pycache__" -exec rm -rf {} +
-	@find . -type d -name ".mypy_cache" -exec rm -rf {} +
+	@find . -type d \( -name "__pycache__" -o -name ".mypy_cache" \) \
+		-prune -exec rm -rf {} +
 	@rm -rf .venv $(VENV_PATH)
 
-lint:
-	@uv run flake8 . --exclude=.venv
-	@uv run mypy . --warn-return-any \
-			--warn-unused-ignores \
-			--ignore-missing-imports \
-			--disallow-untyped-defs \
-			--check-untyped-defs
+lint: install
+	@$(PYTHON) -m flake8 . --exclude=.venv
+	@$(PYTHON) -m mypy . --warn-return-any \
+		--warn-unused-ignores \
+		--ignore-missing-imports \
+		--disallow-untyped-defs \
+		--check-untyped-defs
 
-lint-strict:
-	@uv run flake8 . --exclude=.venv
-	@uv run mypy . --strict
-
+lint-strict: install
+	@$(PYTHON) -m flake8 . --exclude=.venv
+	@$(PYTHON) -m mypy . --strict
