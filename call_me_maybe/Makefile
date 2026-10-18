@@ -16,10 +16,10 @@ venv:
 install: venv
 	@uv pip install --python $(PYTHON) -r pyproject.toml
 
-run: install
+run:
 	@$(PYTHON) -m src
 
-debug: install
+debug:
 	@$(PYTHON) -m pdb -m src
 
 clean:
@@ -27,7 +27,7 @@ clean:
 		-prune -exec rm -rf {} +
 	@rm -rf .venv $(VENV_PATH)
 
-lint: install
+lint:
 	@$(PYTHON) -m flake8 . --exclude=.venv
 	@$(PYTHON) -m mypy . --warn-return-any \
 		--warn-unused-ignores \
@@ -35,6 +35,6 @@ lint: install
 		--disallow-untyped-defs \
 		--check-untyped-defs
 
-lint-strict: install
+lint-strict:
 	@$(PYTHON) -m flake8 . --exclude=.venv
 	@$(PYTHON) -m mypy . --strict
