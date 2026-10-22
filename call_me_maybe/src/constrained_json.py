@@ -102,7 +102,7 @@ def generate_constrained_json(prompt_text: str, cache: Any) -> str:
                     r"(e.g. '*')."
                     "\n"
                     f"User: {prompt_text}\n"
-                    f"Tool Call: {current_str}"
+                    f"Tool Call: {output_text}"
                 )
 
                 token_ids = cache.model.encode(tiny_prompt).tolist()[0]

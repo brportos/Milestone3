@@ -1,4 +1,4 @@
-SGOINFRE  = $(USER) #/sgoinfre/
+SGOINFRE  = /sgoinfre/$(USER)
 VENV_PATH = $(SGOINFRE)/call_me_maybe
 PYTHON    = .venv/bin/python3
 
