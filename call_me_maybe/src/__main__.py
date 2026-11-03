@@ -1,7 +1,7 @@
 import argparse
 import json
 import sys
-from pydantic import BaseModel, ValidationError, ConfigDict
+from pydantic import BaseModel, Field, ValidationError, ConfigDict
 from pydantic.dataclasses import dataclass
 import pathlib
 from llm_sdk import Small_LLM_Model
@@ -15,43 +15,41 @@ from typing import Any, Dict, List, Tuple
 
 @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
 class MaskCache:
-    model: Any
-    vocab_dict: Dict[int, str]
+    model: Any = Field(...)
+    vocab_dict: Dict[int, str] = Field(...)
 
-    allowed_fn: List[str]
-    raw_functions:List[Dict[str, Any]]
-    func_params: Dict[str, int]
-    param_types: Dict[str, Dict[str, Any]]
+    allowed_fn: List[str] = Field(...)
+    raw_functions:List[Dict[str, Any]] = Field(...)
+    func_params: Dict[str, int] = Field(...)
+    param_types: Dict[str, Dict[str, Any]] = Field(...)
 
-    p4_mask: np.ndarray[Any, Any]
-    p4_numbers_only: np.ndarray[Any, Any]
-    p4_no_comma: np.ndarray[Any, Any]
-    mini_dict: List[Tuple[int, str]]
-    clean_dict_items: List[Tuple[int, str]]
+    p4_mask: np.ndarray[Any, Any] = Field(...)
+    p4_numbers_only: np.ndarray[Any, Any] = Field(...)
+    p4_no_comma: np.ndarray[Any, Any] = Field(...)
+    mini_dict: List[Tuple[int, str]] = Field(...)
+    clean_dict_items: List[Tuple[int, str]] = Field(...)
+
 
 class FunctionDef(BaseModel):
-    name: str
-    description: str
-    parameters: Dict[str, Any]
-    returns: Dict[str, Any]
+    name: str = Field(...)
+    description: str = Field(..., min_length=5)
+    parameters: Dict[str, Any] = Field(...)
+    returns: Dict[str, Any] = Field(...)
+
 
 class FunctionCallResult(BaseModel):
-    prompt: str
-    name: str
-    parameters: Dict[str, Any]
+    prompt: str = Field(..., min_length=3)
+    name: str = Field(...)
+    parameters: Dict[str, Any] = Field(...)
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="callMeMaybe",
         description="Call Me Maybe: LLM Function Calling Tool",
-        usage="uv run python3 -m src [--functions definition "
-        "<function_definition_file>] [--input <input_file>] "
-        "[--output <output_file>]"
     )
 
     parser.add_argument(
         '--functions_definition',
-        metavar='',
         type=str,
         default="data/input/functions_definition.json",
         help="Path to JSON file containing the functions definitions."
@@ -59,7 +57,6 @@ def parse_arguments() -> argparse.Namespace:
 
     parser.add_argument(
         '--input',
-        metavar='',
         type=str,
         default="data/input/function_calling_tests.json",
         help="Path to the file containing the prompts."
@@ -67,7 +64,6 @@ def parse_arguments() -> argparse.Namespace:
 
     parser.add_argument(
         '--output',
-        metavar='',
         type=str,
         default="data/output/function_calling_results.json",
         help="Path to the JSON output file."
@@ -79,27 +75,21 @@ def parse_arguments() -> argparse.Namespace:
         default="Qwen/Qwen3-0.6B",
         help="HuggingFace Model ID"
     )
-    
     return parser.parse_args()
 
 def load_json_file(filename: str) -> Any:
-    if not pathlib.Path(filename).is_file():
-        raise SystemExit(f"Error: {filename}")
-    
+    """Load a JSON file, exiting with a clear message on failure."""
     try:
         with open(filename, 'r') as file:
-            json_data = json.load(file)
-    except json.JSONDecodeError:
-        print(file=sys.stderr)
-        sys.exit(1)
+            return json.load(file)
+    except FileNotFoundError:
+        sys.exit(f"Error: file not found: {filename}")
     except PermissionError:
-        print(f"{filename}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error: {filename}", file=sys.stderr)
-        sys.exit(1)
-    
-    return json_data
+        sys.exit(f"Error: permission denied: {filename}")
+    except json.JSONDecodeError as e:
+        sys.exit(f"Error: invalid JSON in {filename}: {e}")
+    except OSError as e:
+        sys.exit(f"Error: cannot read {filename}: {e}")
 
 def main() -> None:
     args = parse_arguments()
@@ -108,13 +98,15 @@ def main() -> None:
 
     allowed_fn_names: list[str] = []
 
-    model = Small_LLM_Model(model_name=args.model)
+    try:
+        model = Small_LLM_Model(model_name=args.model)
+    except Exception as e:
+        sys.exit(f"Error: Could not load model '{args.model}': {e}")
 
     start_time = datetime.now()
-    vocab_file = model.get_path_to_vocab_file()
-    raw_vocab: dict[str, int] = load_json_file(vocab_file)
+    raw_vocab: dict[str, int] = load_json_file(model.get_path_to_vocab_file())
 
-    vocab_dict: dict[int, str] = {v: k.replace('\u0120', ' ') for k, v in raw_vocab.items()}
+    vocab_dict: dict[int, str] = {v: k.replace('Ġ', ' ') for k, v in raw_vocab.items()}
 
     printable_set: set[str] = set(string.printable)
 
