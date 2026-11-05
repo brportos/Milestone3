@@ -1,19 +1,9 @@
 import argparse
+from pydantic import Field, BaseModel
+from typing import Any, Dict, List
 import json
-import sys
-from pydantic import BaseModel, Field, ValidationError, ConfigDict
-from pydantic.dataclasses import dataclass
-import pathlib
-from llm_sdk import Small_LLM_Model
-from src.constrained_json import generate_constrained_json
-from datetime import datetime
-import string
-from rich import print_json
-import numpy as np
-from typing import Any, Dict, List, Tuple
 
 
-@dataclass(config=ConfigDict(arbitrary_types_allowed=True))
 class MaskCache:
     model: Any = Field(...)
     vocab_dict: Dict[int, str] = Field(...)
@@ -23,24 +13,24 @@ class MaskCache:
     func_params: Dict[str, int] = Field(...)
     param_types: Dict[str, Dict[str, Any]] = Field(...)
 
-    p4_mask: np.ndarray[Any, Any] = Field(...)
-    p4_numbers_only: np.ndarray[Any, Any] = Field(...)
-    p4_no_comma: np.ndarray[Any, Any] = Field(...)
-    mini_dict: List[Tuple[int, str]] = Field(...)
-    clean_dict_items: List[Tuple[int, str]] = Field(...)
+
+class Parameter(BaseModel):
+    type: str = Field(...)
 
 
-class FunctionDef(BaseModel):
+class ReturnType(BaseModel):
+    type: str = Field(...)
+
+
+class FunctionDefinition(BaseModel):
     name: str = Field(...)
     description: str = Field(..., min_length=5)
-    parameters: Dict[str, Any] = Field(...)
-    returns: Dict[str, Any] = Field(...)
+    parameters: Dict[str, Parameter] = Field(...)
+    returns: ReturnType
 
 
-class FunctionCallResult(BaseModel):
+class Prompt(BaseModel):
     prompt: str = Field(..., min_length=3)
-    name: str = Field(...)
-    parameters: Dict[str, Any] = Field(...)
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -77,184 +67,61 @@ def parse_arguments() -> argparse.Namespace:
     )
     return parser.parse_args()
 
-def load_json_file(filename: str) -> Any:
-    """Load a JSON file, exiting with a clear message on failure."""
+def load_function_def(path: str):
     try:
-        with open(filename, 'r') as file:
-            return json.load(file)
+        with open(path, 'r', encoding="utf-8") as f:
+            data = json.load(f)
+        return [FunctionDefinition(**item) for item in data]
     except FileNotFoundError:
-        sys.exit(f"Error: file not found: {filename}")
-    except PermissionError:
-        sys.exit(f"Error: permission denied: {filename}")
-    except json.JSONDecodeError as e:
-        sys.exit(f"Error: invalid JSON in {filename}: {e}")
-    except OSError as e:
-        sys.exit(f"Error: cannot read {filename}: {e}")
+        raise RuntimeError(f"File not found: {path}")
+    except json.JSONDecodeError:
+        raise RuntimeError(f"Invalide json file in ({path})")
+    except Exception as e:
+        raise RuntimeError(f"Error: {e}")
 
-def main() -> None:
+def build_system_prompt(functions):
+    lines = [
+        "Strict system rules: use only a matching from the list",
+        "If no functions matches the user's intent (even if type match), set name=None",
+        "Never use an unrelated function for different task",
+        "--",
+        "Available functions"
+    ]
+    for fn in functions:
+        params = ", ".join(
+            f"{name}: {info.type}"
+            for name, info in fn.parameters.items()
+        )
+        lines.append(f" -{fn.name}({params}: {fn.description})")
+    lines.append('\noutput only valid json: {"name": "<fn>", "args": {<args>}}')
+    return "\n".join(lines)
+
+
+def load_prompt(path: str):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return [Prompt(**item) for item in data]
+    except FileNotFoundError:
+        raise RuntimeError(f"File not found : {path}")
+    except json.JSONDecodeError:
+        raise RuntimeError(f"Invalid json file: {path}")
+    except Exception as e:
+        raise RuntimeError(f"Error: {e}")
+def main():
     args = parse_arguments()
-    raw_functions: list[dict[str, Any]] = load_json_file(args.functions_definition)
-    raw_prompts: list[dict[str, Any]] = load_json_file(args.input)
-
-    allowed_fn_names: list[str] = []
-
-    try:
-        model = Small_LLM_Model(model_name=args.model)
-    except Exception as e:
-        sys.exit(f"Error: Could not load model '{args.model}': {e}")
-
-    start_time = datetime.now()
-    raw_vocab: dict[str, int] = load_json_file(model.get_path_to_vocab_file())
-
-    vocab_dict: dict[int, str] = {v: k.replace('Ġ', ' ') for k, v in raw_vocab.items()}
-
-    printable_set: set[str] = set(string.printable)
-
-    valid_ids: list[int] = [
-        token_id for token_id, token_str in vocab_dict.items()
-        if token_str and all(c in printable_set for c in token_str)
-    ]
-
-    clean_dict_items: list[tuple[int, str]] = [
-        (k, v) for k, v in vocab_dict.items()
-        if v and all(c in printable_set for c in v)
-    ]
-    func_params: dict[str, int] = dict()
-    param_types: dict[str, dict[str, Any]] = dict()
-    for fn in raw_functions:
-        try:
-            func = FunctionDef(**fn)
-            allowed_fn_names.append(func.name)
-            func_params[func.name] = len(func.parameters)
-
-            params = fn.get("parameters", {})
-            param_types[func.name] = {}
-
-            for param_key, details in params.items():
-                param_types[func.name][param_key] = details.get("type")
-        except ValidationError as e:
-            print(file=sys.stderr)
-            print(e.errors()[0])
-            sys.exit(1)
-        except Exception as e:
-            print(f"Error: {e}", file=sys.stderr)
-            sys.exit(1)
-    dummy_input_ids = model.encode("dummy").tolist()[0]
-    vocab_size = len(model.get_logits_from_input_ids(dummy_input_ids))
-
-    p4_mask = np.zeros(vocab_size, dtype=bool)
-    p4_mask[valid_ids] = True
-
-    p4_numbers_only = np.zeros(vocab_size, dtype=bool)
-    allowed_math_chars = set("0123456789.-, }")
-    for i, s in clean_dict_items:
-        if all(char in allowed_math_chars for char in s) or s == "null":
-            p4_numbers_only[i] = True
-
-    p4_no_comma = p4_mask.copy()
-    for i, s in clean_dict_items:
-        if ',' in s:
-            p4_no_comma[i] = False
-    
-    target_phrases = allowed_fn_names + ['{"name":"', '","parameters":{', '}']
-    mini_dict = [
-        (i, s) for i, s in clean_dict_items
-        if any(s in phrase for phrase in target_phrases)
-    ]
-
-    cache = MaskCache(
-        model=model,
-        vocab_dict=vocab_dict,
-        allowed_fn=allowed_fn_names,
-        raw_functions=raw_functions,
-        func_params=func_params,
-        param_types=param_types,
-        p4_mask=p4_mask,
-        p4_numbers_only=p4_numbers_only,
-        p4_no_comma=p4_no_comma,
-        mini_dict=mini_dict,
-        clean_dict_items=clean_dict_items
-    )
-
-    final_results_list: list[dict[str, Any]] = []
-    for prompt in raw_prompts:
-        prompt_text: str = prompt['prompt']
-
-        print(f"\nprompt: {prompt_text}")
-
-        raw_json_string = generate_constrained_json(prompt_text, cache)
-        try:
-            json_str = raw_json_string
-            extracted_dict = json.loads(json_str)
-
-            fn_name = extracted_dict.get("name")
-            expected_params = {}
-            for fn in raw_functions:
-                if fn.get("name") == fn_name:
-                    expected_params = fn.get("parameters", {})
-                    break
-            
-            if "parameters" in extracted_dict:
-                for key, val in extracted_dict["parameters"].items():
-                    if (
-                        key in expected_params
-                        and expected_params[key].get("type") == "number"
-                    ):
-                        if isinstance(val, int) and not isinstance(val, bool):
-                            extracted_dict["parameters"][key] = float(val)
-                    elif isinstance(val, str):
-                        extracted_dict["parameters"][key] = val.strip()
-            
-            final_data = {
-                "prompt": prompt_text,
-                "name": extracted_dict["name"],
-                "parameters": extracted_dict["parameters"]
-            }
-
-            result = FunctionCallResult(**final_data)
-            final_results_list.append(result.model_dump())
-
-            print()
-            print_json(data=final_data)
-
-        except ValidationError as e:
-            print(file=sys.stderr)
-            print(e.errors()[0])
-            sys.exit(1)
-
-        except Exception as e:
-            print(f"Error: {e}", file=sys.stderr)
-            sys.exit(1)
-    output_file = pathlib.Path(args.output)
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-
-    pathlib.Path(args.output).touch(exist_ok=True)
-
-    if not output_file.is_file():
-        print(f"Not found: {args.output}", file=sys.stderr)
-        sys.exit(1)
-    try:
-        with open(args.output, 'w') as file:
-            json.dump(final_results_list, file, indent=4)
-    except PermissionError as e:
-        print(f"Error: {args.output}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-    
-    elapsed_time = datetime.now() - start_time
-    total_seconds = elapsed_time.total_seconds()
-    minutes = int(total_seconds // 60)
-    seconds = int(total_seconds % 60)
-
-    print(f"\nDone in {minutes}m {seconds}s!")
-
-
-
+    functions = load_function_def(args.functions_definition)
+    if not functions:
+        raise RuntimeError(f"Functions definition can't be empty")
+    prompt = load_prompt(args.input)
+    if not prompt:
+        raise RuntimeError(f"Input can't be empty")
+    system = build_system_prompt(functions)
+    print(system)
 
 if __name__ == "__main__":
     try:
         main()
-    except KeyboardInterrupt:
-        sys.exit(0)
+    except RuntimeError as e:
+        print(f"Error: {e}")
+   
