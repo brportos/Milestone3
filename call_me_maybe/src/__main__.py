@@ -81,6 +81,9 @@ def load_function_def(path: str):
     except Exception as e:
         raise RuntimeError(f"Error: {e}")
 
+def get_best_valid_ids(logits, valid_ids):
+    return max(valid_ids, key=lambda i: logits[i])
+
 def build_json_valid_ids(vocab: dict):
     json_safe = set(
         'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -148,14 +151,23 @@ def main():
     start_time = time.time()
     for p in prompts:
         prompt = p.prompt
-        full_prompt = f"{system}\nUser prompt: {prompt}"
+        full_prompt = f"{system}\nUser prompt: {prompt}\nAssistance: "
         input_ids = model.encode(full_prompt)
         generated_ids =  input_ids[0].tolist()
-        print(generated_ids)
+        all_generated= []
+
+        for _ in range(50):
+            logits = model.get_logits_from_input_ids(generated_ids + all_generated)
+            next_ids = get_best_valid_ids(logits, valid_ids)
+
+            all_generated.append(next_ids)
+            text = model.decode(all_generated)
+            print(text)
+        
 
 if __name__ == "__main__":
     try:
         main()
-    except RuntimeError as e:
+    except BaseException as e:
         print(f"Error: {e}")
    
