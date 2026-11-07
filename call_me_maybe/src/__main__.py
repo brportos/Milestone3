@@ -2,6 +2,8 @@ import argparse
 from pydantic import Field, BaseModel
 from typing import Any, Dict, List
 import json
+from llm_sdk import Small_LLM_Model
+import time
 
 
 class MaskCache:
@@ -79,6 +81,24 @@ def load_function_def(path: str):
     except Exception as e:
         raise RuntimeError(f"Error: {e}")
 
+def build_json_valid_ids(vocab: dict):
+    json_safe = set(
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        '0123456789*_.,:-+/\\\'!?()[]{}"ĠČ'
+    )
+    valid = set()
+    for token_str, token_ids in vocab.items():
+        if token_str and all(c in json_safe for c in token_str):
+            valid.add(token_ids)
+    return valid
+
+def load_vocabulary(model: Small_LLM_Model):
+    vocab_path = model.get_path_to_tokenizer_file()
+    with open(vocab_path, "r", encoding="utf-8") as f:
+        tok_data = json.load(f)
+    raw_vocab = tok_data.get("model", {}).get("vocab", {})
+    return raw_vocab
+
 def build_system_prompt(functions):
     lines = [
         "Strict system rules: use only a matching from the list",
@@ -92,7 +112,7 @@ def build_system_prompt(functions):
             f"{name}: {info.type}"
             for name, info in fn.parameters.items()
         )
-        lines.append(f" -{fn.name}({params}: {fn.description})")
+        lines.append(f" -{fn.name}({params}): {fn.description})")
     lines.append('\noutput only valid json: {"name": "<fn>", "args": {<args>}}')
     return "\n".join(lines)
 
@@ -113,11 +133,25 @@ def main():
     functions = load_function_def(args.functions_definition)
     if not functions:
         raise RuntimeError(f"Functions definition can't be empty")
-    prompt = load_prompt(args.input)
-    if not prompt:
+    prompts = load_prompt(args.input)
+    if not prompts:
         raise RuntimeError(f"Input can't be empty")
     system = build_system_prompt(functions)
-    print(system)
+    try:
+        model = Small_LLM_Model(model_name=args.model)
+    except OSError:
+        raise RuntimeError(f"model: {args.model} not found")
+    vocab = load_vocabulary(model)
+    valid_ids = build_json_valid_ids(vocab)
+    
+    all_results = []
+    start_time = time.time()
+    for p in prompts:
+        prompt = p.prompt
+        full_prompt = f"{system}\nUser prompt: {prompt}"
+        input_ids = model.encode(full_prompt)
+        generated_ids =  input_ids[0].tolist()
+        print(generated_ids)
 
 if __name__ == "__main__":
     try:
